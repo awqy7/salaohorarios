@@ -30,14 +30,14 @@ const LS_SCHEDULES    = 'goldcuts_schedules';
 export async function getAppointments(): Promise<Appointment[]> {
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('appointments')
         .select('*')
         .order('date', { ascending: true })
         .order('time', { ascending: true });
 
       if (!error && data) {
-        return data.map(r => ({
+        return (data as any[]).map((r: any) => ({
           id:          r.id,
           clientName:  r.client_name,
           clientPhone: r.client_phone,
@@ -59,7 +59,7 @@ export async function getAppointments(): Promise<Appointment[]> {
 export async function saveAppointment(a: Appointment): Promise<void> {
   if (supabase) {
     try {
-      const { error } = await supabase.from('appointments').insert([{
+      const { error } = await (supabase as any).from('appointments').insert([{
         client_name:  a.clientName,
         client_phone: a.clientPhone,
         service_id:   a.serviceId,
@@ -67,7 +67,7 @@ export async function saveAppointment(a: Appointment): Promise<void> {
         time:         a.time + ':00',
         status:       a.status,
         paid:         a.paid,
-      }]);
+      }] as any);
       if (!error) return;
     } catch (_) { /* fallback */ }
   }
@@ -81,13 +81,13 @@ export async function saveAppointment(a: Appointment): Promise<void> {
 export async function getSchedules(): Promise<BarberSchedule[]> {
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('schedules')
         .select('*')
         .order('day_of_week', { ascending: true });
 
       if (!error && data && data.length > 0) {
-        return data.map(r => ({
+        return (data as any[]).map((r: any) => ({
           id:         String(r.id),
           dayOfWeek:  r.day_of_week,
           isWorking:  r.is_working,
@@ -107,7 +107,7 @@ export async function saveSchedules(schedules: BarberSchedule[]): Promise<void> 
     try {
       let ok = true;
       for (const s of schedules) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('schedules')
           .update({
             is_working: s.isWorking,
