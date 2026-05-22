@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, Calendar, Clock, Scissors } from 'lucide-react';
+import { CheckCircle, Calendar, Clock, Scissors, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { services } from '../lib/db';
@@ -25,36 +25,55 @@ export function ClientSuccess() {
   const firstName = appointment.clientName.split(' ')[0];
 
   return (
-    <div style={{ maxWidth: '560px', margin: '0 auto', textAlign: 'center' }}>
-      <div className="card animate-fade-in" style={{ padding: '3rem 2rem' }}>
-        <CheckCircle size={80} color="var(--success)" style={{ margin: '0 auto 1.5rem' }} />
-        <h2 style={{ color: 'var(--primary)', marginBottom: '0.75rem' }}>
-          Agendamento Confirmado! 🎉
+    <div style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
+      <div className="card animate-scale-in" style={{ padding: '2.5rem 2rem' }}>
+        <div style={{
+          width: 88, height: 88, borderRadius: '50%',
+          background: 'var(--success-bg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 1.5rem',
+          border: '2px solid rgba(52,211,153,0.15)',
+        }}>
+          <CheckCircle size={52} color="var(--success)" className="animate-bounce" />
+        </div>
+
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
+          <span className="gold-text">Agendamento Confirmado!</span>
         </h2>
-        <p style={{ fontSize: '1.1rem', marginBottom: '2rem' }}>
-          Olá <strong>{firstName}</strong>, seu agendamento foi confirmado e o pagamento aprovado!
+        <p style={{ fontSize: '1rem', marginBottom: '2rem', color: 'var(--text-secondary)' }}>
+          Olá <strong style={{ color: 'var(--text-primary)' }}>{firstName}</strong>, seu horário foi reservado com sucesso.
         </p>
 
-        <div style={{ background: 'var(--surface-light)', borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem', textAlign: 'left' }}>
+        <div style={{
+          background: 'var(--surface-elevated)', borderRadius: 'var(--radius-md)',
+          padding: '1.25rem', marginBottom: '2rem', textAlign: 'left',
+          border: '1px solid var(--border)',
+        }}>
           {[
-            { icon: <Scissors size={18} color="var(--primary)" />, label: 'Serviço', value: svc?.name || 'Serviço' },
-            { icon: <Calendar size={18} color="var(--primary)" />, label: 'Data',    value: displayDate },
-            { icon: <Clock size={18} color="var(--primary)" />,    label: 'Horário', value: appointment.time },
+            { icon: <Scissors size={16} color="var(--gold-500)" />, label: 'Serviço', value: svc?.name || '—' },
+            { icon: <Calendar size={16} color="var(--gold-500)" />, label: 'Data', value: displayDate },
+            { icon: <Clock size={16} color="var(--gold-500)" />, label: 'Horário', value: appointment.time },
           ].map(({ icon, label, value }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              {icon}
-              <span style={{ color: 'var(--text-muted)', minWidth: '70px' }}>{label}</span>
-              <strong>{value}</strong>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'rgba(212,167,74,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {icon}
+              </div>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', minWidth: '60px' }}>{label}</span>
+              <strong style={{ fontSize: '0.9rem' }}>{value}</strong>
             </div>
           ))}
         </div>
 
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '2rem' }}>
-          Te esperamos no horário marcado. Qualquer imprevisto, entre em contato conosco. 💇
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '2rem', lineHeight: 1.6 }}>
+          Chegue no horário para garantir o melhor atendimento. <br />
+          Se precisar remarcar, entre em contato conosco.
         </p>
 
         <Link to="/" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-          Fazer Novo Agendamento
+          Novo Agendamento
         </Link>
       </div>
     </div>

@@ -1,25 +1,23 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Scissors, LogIn } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Scissors } from 'lucide-react';
 
 export function Header() {
-  const location = useLocation();
-  const isBarberArea = location.pathname.startsWith('/barber');
-
   return (
     <header className="header">
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <Scissors color="var(--primary)" size={26} />
-          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            Gold<span style={{ color: 'var(--primary)' }}>Cuts</span>
+      <div className="container header-inner" style={{ justifyContent: 'center' }}>
+        <Link to="/" className="header-logo">
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'var(--gold-gradient)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 12px rgba(212,167,74,0.25)',
+          }}>
+            <Scissors size={20} color="var(--text-inverse)" />
+          </div>
+          <span className="header-logo-text" style={{ fontSize: '1.25rem' }}>
+            Gold<span>Cuts</span>
           </span>
         </Link>
-
-        {!isBarberArea && (
-          <Link to="/barber/login" className="btn btn-secondary" style={{ fontSize: '0.9rem' }}>
-            <LogIn size={16} /> Área do Barbeiro
-          </Link>
-        )}
       </div>
     </header>
   );

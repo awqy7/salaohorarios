@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Scissors, Eye, EyeOff } from 'lucide-react';
+import { Scissors, Eye, EyeOff, LogIn } from 'lucide-react';
 import { supabase, supabaseAvailable } from '../lib/supabase';
 
 export function BarberLogin() {
@@ -17,28 +17,22 @@ export function BarberLogin() {
     setError('');
 
     if (supabaseAvailable && supabase) {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) {
-        setError('Falha no login: verifique seu e-mail e senha.');
+        setError('E-mail ou senha inválidos.');
         setIsLoading(false);
         return;
       }
-
       if (data.user) {
         sessionStorage.setItem('barber_auth', 'true');
         navigate('/barber/dashboard');
       }
     } else {
-      // Fallback local caso o Supabase não esteja conectado
       if (email === 'admin@barbearia.com' && password === 'admin') {
         sessionStorage.setItem('barber_auth', 'true');
         navigate('/barber/dashboard');
       } else {
-        setError('Credenciais inválidas. Tente novamente.');
+        setError('Credenciais inválidas.');
       }
     }
     setIsLoading(false);
@@ -46,18 +40,25 @@ export function BarberLogin() {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh' }}>
-      <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+      <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '380px', padding: '2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <Scissors size={48} color="var(--primary)" style={{ display: 'block', margin: '0 auto 1rem' }} />
-          <h2 style={{ marginBottom: '0.25rem' }}>Área do Barbeiro</h2>
-          <p style={{ margin: 0 }}>Acesso restrito</p>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'var(--gold-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 1rem', boxShadow: '0 4px 16px rgba(212,167,74,0.2)',
+          }}>
+            <Scissors size={26} color="var(--text-inverse)" />
+          </div>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '0.25rem' }}>Área do Barbeiro</h2>
+          <p style={{ fontSize: '0.85rem', margin: 0, color: 'var(--text-muted)' }}>Acesse o painel de controle</p>
         </div>
 
         {error && (
           <div style={{
-            background: 'rgba(239,68,68,0.1)', color: 'var(--danger)',
-            padding: '0.875rem 1rem', borderRadius: '8px',
-            marginBottom: '1.5rem', textAlign: 'center', fontSize: '0.9rem'
+            background: 'var(--danger-bg)', color: 'var(--danger)',
+            padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)',
+            marginBottom: '1.5rem', textAlign: 'center', fontSize: '0.85rem',
+            border: '1px solid rgba(248,113,113,0.15)',
           }}>
             {error}
           </div>
@@ -67,7 +68,8 @@ export function BarberLogin() {
           <div className="input-group">
             <label>E-mail</label>
             <input type="email" className="input" value={email}
-              onChange={e => setEmail(e.target.value)} required placeholder="admin@barbearia.com" />
+              onChange={e => setEmail(e.target.value)} required
+              placeholder="admin@barbearia.com" />
           </div>
           <div className="input-group">
             <label>Senha</label>
@@ -75,19 +77,19 @@ export function BarberLogin() {
               <input type={showPw ? 'text' : 'password'} className="input" value={password}
                 onChange={e => setPassword(e.target.value)} required placeholder="••••••" />
               <button type="button" onClick={() => setShowPw(!showPw)}
-                style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                style={{
+                  position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+                  padding: 0, display: 'flex',
+                }}>
                 {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={isLoading}>
-            {isLoading ? 'Entrando...' : 'Entrar no Painel'}
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.75rem' }} disabled={isLoading}>
+            {isLoading ? 'Entrando...' : <><LogIn size={16} /> Entrar no Painel</>}
           </button>
         </form>
-
-        <p style={{ textAlign: 'center', fontSize: '0.8rem', marginTop: '1.5rem', marginBottom: 0, color: 'var(--text-muted)' }}>
-          Acesso com a conta do Supabase: admin@barbearia.com
-        </p>
       </div>
     </div>
   );
