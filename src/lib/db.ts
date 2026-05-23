@@ -80,8 +80,7 @@ export async function saveAppointment(a: Appointment): Promise<void> {
       createdat: a.createdAt,
     };
 
-    const { error } = await supabase
-      .from('appointments')
+    const { error } = await (supabase.from('appointments') as any)
       .upsert(record, { onConflict: 'id' });
 
     if (!error) return;
@@ -122,8 +121,7 @@ export async function getSchedules(): Promise<BarberSchedule[]> {
 export async function saveSchedules(schedules: BarberSchedule[]): Promise<void> {
   if (supabaseAvailable && supabase) {
     for (const s of schedules) {
-      await supabase
-        .from('schedules')
+      await (supabase.from('schedules') as any)
         .upsert({
           id: s.id,
           dayofweek: s.dayOfWeek,
