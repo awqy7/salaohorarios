@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, Clock, User, ArrowRight, Sparkles, Check, Star, Timer } from 'lucide-react';
-import { services, getAvailableTimes } from '../lib/db';
+import { services, prefetchAvailableTimes } from '../lib/db';
 import type { Service } from '../types';
 
 const popularId = '5';
@@ -17,20 +17,32 @@ export function Home() {
   const [clientName, setClientName]           = useState('');
   const [clientPhone, setClientPhone]         = useState('');
   const [loadingTimes, setLoadingTimes]       = useState(false);
+  const timesCache = useRef<Map<string, string[]>>(new Map());
 
-  const upcomingDates = Array.from({ length: 7 }).map((_, i) =>
-    format(addDays(new Date(), i), 'yyyy-MM-dd')
+  const [upcomingDates] = useState(() =>
+    Array.from({ length: 7 }).map((_, i) =>
+      format(addDays(new Date(), i), 'yyyy-MM-dd')
+    )
   );
 
+  // Prefetch todos os 7 dias de uma vez quando o serviço mudar
   useEffect(() => {
-    if (!selectedDate || !selectedService) return;
-    setLoadingTimes(true);
+    if (!selectedService) return;
+    setSelectedDate('');
     setSelectedTime('');
-    getAvailableTimes(selectedDate, selectedService.duration)
-      .then(times => setAvailableTimes(times))
-      .catch(() => setAvailableTimes([]))
+    setLoadingTimes(true);
+    prefetchAvailableTimes(upcomingDates, selectedService.duration)
+      .then(map => { timesCache.current = map; })
       .finally(() => setLoadingTimes(false));
-  }, [selectedDate, selectedService]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedService]);
+
+  // Leitura instantânea do cache quando selecionar uma data
+  useEffect(() => {
+    if (!selectedDate) return;
+    setSelectedTime('');
+    setAvailableTimes(timesCache.current.get(selectedDate) || []);
+  }, [selectedDate]);
 
   const handleContinue = () => {
     if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone) return;

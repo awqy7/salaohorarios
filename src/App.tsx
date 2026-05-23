@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Scissors, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { Header } from './components/Header';
 import { Home } from './pages/Home';
 import { ClientPayment } from './pages/ClientPayment';

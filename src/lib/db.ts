@@ -1,7 +1,6 @@
-import type { Service, Appointment, BarberSchedule } from '../types';
-import { supabase } from './supabase';
+﻿import type { Service, Appointment, BarberSchedule } from '../types';
 
-// ─── Serviços (fixos no front) ─────────────────────────────────────
+// ─── Serviços (fixos no front) ──────────────────────────────────────────
 export const services: Service[] = [
   { id: '1', name: 'Corte Degradê (Fade)', price: 35, duration: 40, image: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=400&q=80' },
   { id: '2', name: 'Corte Americano',      price: 30, duration: 30, image: 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=400&q=80' },
@@ -10,144 +9,117 @@ export const services: Service[] = [
   { id: '5', name: 'Cabelo + Barba',       price: 55, duration: 60, image: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=400&q=80' },
 ];
 
-// ─── Horários padrão ───────────────────────────────────────────────
+// ─── Horários padrão ───────────────────────────────────────────────────
 const defaultSchedules: BarberSchedule[] = [
-  { id: '0', dayOfWeek: 0, isWorking: false, startTime: '09:00', endTime: '18:00' },
-  { id: '1', dayOfWeek: 1, isWorking: true,  startTime: '09:00', endTime: '19:00' },
-  { id: '2', dayOfWeek: 2, isWorking: true,  startTime: '09:00', endTime: '19:00' },
-  { id: '3', dayOfWeek: 3, isWorking: true,  startTime: '09:00', endTime: '19:00' },
-  { id: '4', dayOfWeek: 4, isWorking: true,  startTime: '09:00', endTime: '19:00' },
-  { id: '5', dayOfWeek: 5, isWorking: true,  startTime: '09:00', endTime: '20:00' },
-  { id: '6', dayOfWeek: 6, isWorking: true,  startTime: '09:00', endTime: '17:00' },
+  { id: '0', dayOfWeek: 0, isWorking: false, startTime: '09:00', endTime: '18:00', lunchStart: '12:00', lunchEnd: '13:00' },
+  { id: '1', dayOfWeek: 1, isWorking: true,  startTime: '09:00', endTime: '19:00', lunchStart: '12:00', lunchEnd: '13:00' },
+  { id: '2', dayOfWeek: 2, isWorking: true,  startTime: '09:00', endTime: '19:00', lunchStart: '12:00', lunchEnd: '13:00' },
+  { id: '3', dayOfWeek: 3, isWorking: true,  startTime: '09:00', endTime: '19:00', lunchStart: '12:00', lunchEnd: '13:00' },
+  { id: '4', dayOfWeek: 4, isWorking: true,  startTime: '09:00', endTime: '19:00', lunchStart: '12:00', lunchEnd: '13:00' },
+  { id: '5', dayOfWeek: 5, isWorking: true,  startTime: '09:00', endTime: '20:00', lunchStart: '12:00', lunchEnd: '13:00' },
+  { id: '6', dayOfWeek: 6, isWorking: true,  startTime: '09:00', endTime: '17:00', lunchStart: '12:00', lunchEnd: '13:00' },
 ];
 
-// ─── Keys localStorage (fallback) ─────────────────────────────────
+// ─── Keys localStorage ──────────────────────────────────────────────────
 const LS_APPOINTMENTS = 'goldcuts_appointments';
 const LS_SCHEDULES    = 'goldcuts_schedules';
 
-// ─── Helpers ───────────────────────────────────────────────────────
+// ─── Cache em memória ───────────────────────────────────────────────────
+let cachedAppointments: Appointment[] | null = null;
+let cachedSchedules: BarberSchedule[] | null = null;
+let cacheApptsAt = 0;
+let cacheSchedsAt = 0;
+const CACHE_TTL = 30_000; // 30s
+
+function loadFromLS<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as T : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveToLS(key: string, data: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch { /* quota exceeded, ignora */ }
+}
 
 export async function getAppointments(): Promise<Appointment[]> {
-  if (supabase) {
-    try {
-      const { data, error } = await (supabase as any)
-        .from('appointments')
-        .select('*')
-        .order('date', { ascending: true })
-        .order('time', { ascending: true });
-
-      if (!error && data) {
-        return (data as any[]).map((r: any) => ({
-          id:          r.id,
-          clientName:  r.client_name,
-          clientPhone: r.client_phone,
-          serviceId:   r.service_id,
-          date:        r.date,
-          time:        (r.time as string).substring(0, 5),
-          status:      r.status,
-          paid:        r.paid,
-          createdAt:   r.created_at,
-        }));
-      }
-    } catch (_) { /* fallback */ }
+  const now = Date.now();
+  if (cachedAppointments && (now - cacheApptsAt) < CACHE_TTL) {
+    return cachedAppointments;
   }
-
-  const raw = localStorage.getItem(LS_APPOINTMENTS);
-  return raw ? JSON.parse(raw) : [];
+  cachedAppointments = loadFromLS<Appointment[]>(LS_APPOINTMENTS, []);
+  cacheApptsAt = now;
+  return cachedAppointments;
 }
 
 export async function saveAppointment(a: Appointment): Promise<void> {
-  if (supabase) {
-    try {
-      const { error } = await (supabase as any).from('appointments').insert([{
-        client_name:  a.clientName,
-        client_phone: a.clientPhone,
-        service_id:   a.serviceId,
-        date:         a.date,
-        time:         a.time + ':00',
-        status:       a.status,
-        paid:         a.paid,
-      }] as any);
-      if (!error) return;
-    } catch (_) { /* fallback */ }
-  }
-
-  // localStorage fallback
   const all = await getAppointments();
-  all.push(a);
-  localStorage.setItem(LS_APPOINTMENTS, JSON.stringify(all));
+  const idx = all.findIndex(x => x.id === a.id);
+  if (idx >= 0) {
+    all[idx] = a;
+  } else {
+    all.push(a);
+  }
+  cachedAppointments = all;
+  cacheApptsAt = Date.now();
+  saveToLS(LS_APPOINTMENTS, all);
 }
 
 export async function getSchedules(): Promise<BarberSchedule[]> {
-  if (supabase) {
-    try {
-      const { data, error } = await (supabase as any)
-        .from('schedules')
-        .select('*')
-        .order('day_of_week', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        return (data as any[]).map((r: any) => ({
-          id:         String(r.id),
-          dayOfWeek:  r.day_of_week,
-          isWorking:  r.is_working,
-          startTime:  (r.start_time as string).substring(0, 5),
-          endTime:    (r.end_time   as string).substring(0, 5),
-        }));
-      }
-    } catch (_) { /* fallback */ }
+  const now = Date.now();
+  if (cachedSchedules && (now - cacheSchedsAt) < CACHE_TTL) {
+    return cachedSchedules;
   }
-
-  const raw = localStorage.getItem(LS_SCHEDULES);
-  return raw ? JSON.parse(raw) : defaultSchedules;
+  cachedSchedules = loadFromLS<BarberSchedule[]>(LS_SCHEDULES, defaultSchedules);
+  cacheSchedsAt = now;
+  return cachedSchedules;
 }
 
 export async function saveSchedules(schedules: BarberSchedule[]): Promise<void> {
-  if (supabase) {
-    try {
-      let ok = true;
-      for (const s of schedules) {
-        const { error } = await (supabase as any)
-          .from('schedules')
-          .update({
-            is_working: s.isWorking,
-            start_time: s.startTime + ':00',
-            end_time:   s.endTime   + ':00',
-          })
-          .eq('id', s.id);
-        if (error) { ok = false; break; }
-      }
-      if (ok) return;
-    } catch (_) { /* fallback */ }
-  }
-
-  localStorage.setItem(LS_SCHEDULES, JSON.stringify(schedules));
+  cachedSchedules = schedules;
+  cacheSchedsAt = Date.now();
+  saveToLS(LS_SCHEDULES, schedules);
 }
 
-export async function getAvailableTimes(dateStr: string, duration: number): Promise<string[]> {
-  const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
-  const schedules = await getSchedules();
-  const daySchedule = schedules.find(s => s.dayOfWeek === dayOfWeek);
-
-  if (!daySchedule || !daySchedule.isWorking) return [];
-
-  const appointments = await getAppointments();
-  const dayApps = appointments.filter(a => a.date === dateStr && a.status !== 'cancelled');
-
+function computeAvailableTimes(
+  dateStr: string,
+  duration: number,
+  daySchedule: BarberSchedule,
+  dayApps: Appointment[]
+): string[] {
   const times: string[] = [];
   let current = new Date(`${dateStr}T${daySchedule.startTime}:00`);
   const end    = new Date(`${dateStr}T${daySchedule.endTime}:00`);
+  const lunchStart = new Date(`${dateStr}T${daySchedule.lunchStart}:00`);
+  const lunchEnd   = new Date(`${dateStr}T${daySchedule.lunchEnd}:00`);
 
   while (current < end) {
+    // Pula intervalo de almoço
+    if (current >= lunchStart && current < lunchEnd) {
+      current = lunchEnd;
+      continue;
+    }
+
     const timeStr = current.toTimeString().substring(0, 5);
+
+    const slotEndTime = new Date(current.getTime() + duration * 60000);
+
+    // Se o horário extrapola o almoço, pula
+    if (current < lunchEnd && slotEndTime > lunchStart) {
+      current = lunchEnd;
+      continue;
+    }
 
     const isTaken = dayApps.some(app => {
       const svc = services.find(s => s.id === app.serviceId);
       const dur = svc ? svc.duration : 30;
       const appStart = new Date(`${dateStr}T${app.time}:00`);
       const appEnd   = new Date(appStart.getTime() + dur * 60000);
-      const slotEnd  = new Date(current.getTime() + duration * 60000);
-      return current < appEnd && slotEnd > appStart;
+      return current < appEnd && slotEndTime > appStart;
     });
 
     if (!isTaken) times.push(timeStr);
@@ -155,4 +127,45 @@ export async function getAvailableTimes(dateStr: string, duration: number): Prom
   }
 
   return times;
+}
+
+export async function getAvailableTimes(dateStr: string, duration: number): Promise<string[]> {
+  const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+  const [schedules, appointments] = await Promise.all([getSchedules(), getAppointments()]);
+  const daySchedule = schedules.find(s => s.dayOfWeek === dayOfWeek);
+
+  if (!daySchedule || !daySchedule.isWorking) return [];
+
+  const dayApps = appointments.filter(a => a.date === dateStr && a.status !== 'cancelled');
+  return computeAvailableTimes(dateStr, duration, daySchedule, dayApps);
+}
+
+export async function prefetchAvailableTimes(
+  dates: string[],
+  duration: number
+): Promise<Map<string, string[]>> {
+  const [schedules, appointments] = await Promise.all([
+    getSchedules(),
+    getAppointments(),
+  ]);
+
+  const result = new Map<string, string[]>();
+
+  for (const dateStr of dates) {
+    const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+    const daySchedule = schedules.find(s => s.dayOfWeek === dayOfWeek);
+
+    if (!daySchedule || !daySchedule.isWorking) {
+      result.set(dateStr, []);
+      continue;
+    }
+
+    const dayApps = appointments.filter(
+      a => a.date === dateStr && a.status !== 'cancelled'
+    );
+
+    result.set(dateStr, computeAvailableTimes(dateStr, duration, daySchedule, dayApps));
+  }
+
+  return result;
 }

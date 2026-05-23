@@ -11,10 +11,11 @@ export interface Appointment {
   clientName: string;
   clientPhone: string;
   serviceId: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:mm
+  date: string;
+  time: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   paid: boolean;
+  paymentProof?: string;
   createdAt: string;
 }
 
@@ -24,4 +25,6 @@ export interface BarberSchedule {
   isWorking: boolean;
   startTime: string; // HH:mm
   endTime: string; // HH:mm
+  lunchStart: string; // HH:mm
+  lunchEnd: string; // HH:mm
 }

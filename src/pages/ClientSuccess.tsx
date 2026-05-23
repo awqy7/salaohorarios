@@ -1,24 +1,17 @@
-import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, Calendar, Clock, Scissors, MapPin } from 'lucide-react';
+import { CheckCircle, Calendar, Clock, Scissors } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { services } from '../lib/db';
 
 export function ClientSuccess() {
   const navigate = useNavigate();
-  const [appointment, setAppointment] = useState<any>(null);
-
-  useEffect(() => {
-    const raw = sessionStorage.getItem('last_appointment');
-    if (raw) {
-      setAppointment(JSON.parse(raw));
-    } else {
-      navigate('/');
-    }
-  }, [navigate]);
-
-  if (!appointment) return null;
+  const raw = sessionStorage.getItem('last_appointment');
+  if (!raw) {
+    navigate('/');
+    return null;
+  }
+  const appointment = JSON.parse(raw);
 
   const svc = services.find(s => s.id === appointment.serviceId);
   const displayDate = format(new Date(appointment.date + 'T00:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR });

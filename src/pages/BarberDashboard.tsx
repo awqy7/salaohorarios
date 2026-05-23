@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Users, Calendar, Settings, CheckCircle, BarChart2, LogOut, Clock, TrendingUp } from 'lucide-react';
+import { DollarSign, Users, Calendar, Settings, CheckCircle, BarChart2, LogOut, Clock, TrendingUp, Eye, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { getAppointments, getSchedules, saveSchedules, services } from '../lib/db';
+
+import { getAppointments, getSchedules, saveSchedules, saveAppointment, services } from '../lib/db';
 import type { Appointment, BarberSchedule } from '../types';
 
 const daysOfWeek = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -20,22 +20,29 @@ export function BarberDashboard() {
       navigate('/barber/login');
       return;
     }
-    loadData();
+    (async () => {
+      const [apps, scheds] = await Promise.all([getAppointments(), getSchedules()]);
+      setAppointments(apps);
+      setSchedules(scheds);
+    })();
   }, [navigate]);
 
-  const loadData = async () => {
-    const [apps, scheds] = await Promise.all([getAppointments(), getSchedules()]);
-    setAppointments(apps);
-    setSchedules(scheds);
+  const handleReject = async (app: Appointment) => {
+    const updated = { ...app, status: 'cancelled' as const };
+    await saveAppointment(updated);
+    setAppointments(prev => prev.map(a => a.id === app.id ? updated : a));
   };
 
   const handleSaveSchedule = async () => {
     setSaving(true);
-    await saveSchedules(schedules);
+    const fixed = schedules.map(s => ({ ...s, lunchStart: '12:00', lunchEnd: '13:00' }));
+    setSchedules(fixed);
+    await saveSchedules(fixed);
     setSaving(false);
     alert('Horários salvos com sucesso!');
   };
 
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   const handleScheduleChange = (id: string, field: keyof BarberSchedule, value: any) => {
     setSchedules(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
@@ -87,7 +94,7 @@ export function BarberDashboard() {
           <button
             key={key}
             className={`btn ${activeTab === key ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setActiveTab(key as any)}
+            onClick={() => setActiveTab(key as 'overview' | 'appointments' | 'schedule')}
             style={{ fontSize: '0.8rem', padding: '0.6rem 1rem', whiteSpace: 'nowrap', minHeight: '40px' }}
           >
             <Icon size={15} /> {label}
@@ -151,10 +158,10 @@ export function BarberDashboard() {
       )}
 
       {activeTab === 'appointments' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <h3 style={{ fontSize: '1.05rem', margin: 0 }}>
-              Todos os Agendamentos
+              Agendamentos
               <span style={{
                 marginLeft: '0.5rem', fontSize: '0.75rem', fontWeight: 600,
                 color: 'var(--gold-500)', background: 'rgba(212,167,74,0.08)',
@@ -166,129 +173,163 @@ export function BarberDashboard() {
           </div>
 
           {confirmed.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', padding: '2rem 1.5rem', margin: 0, textAlign: 'center' }}>
-              Nenhum agendamento ainda.
-            </p>
+            <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+              <Calendar size={48} color="var(--text-muted)" style={{ opacity: 0.2, marginBottom: '1rem' }} />
+              <p style={{ color: 'var(--text-muted)', margin: 0 }}>Nenhum agendamento ainda.</p>
+            </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    {['Data', 'Horário', 'Cliente', 'WhatsApp', 'Serviço', 'Valor', 'Status'].map(h => (
-                      <th key={h} style={{
-                        padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600,
-                        fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase',
-                        letterSpacing: '0.05em', whiteSpace: 'nowrap',
-                      }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {confirmed.sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)).map(app => {
-                    const svc = services.find(s => s.id === app.serviceId);
-                    const displayDate = format(new Date(app.date + 'T00:00:00'), 'dd/MM/yyyy');
-                    return (
-                      <tr key={app.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>{displayDate}</td>
-                        <td style={{
-                          padding: '0.75rem 1rem', color: 'var(--gold-500)', fontWeight: 700,
-                          fontFamily: 'var(--font-display)', fontSize: '0.95rem', whiteSpace: 'nowrap',
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {confirmed.sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)).map(app => {
+                const svc = services.find(s => s.id === app.serviceId);
+                const displayDate = format(new Date(app.date + 'T00:00:00'), 'dd/MM');
+                const isConfirmed = app.status === 'confirmed';
+                return (
+                  <div key={app.id} className="card" style={{
+                    padding: '1rem',
+                    borderLeft: `3px solid ${isConfirmed ? 'var(--success)' : 'var(--text-muted)'}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.15rem' }}>
+                          {app.clientName}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {app.clientPhone}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{
+                          fontFamily: 'var(--font-display)', fontWeight: 700,
+                          fontSize: '1rem', color: 'var(--gold-500)',
                         }}>
                           {app.time}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 500, fontSize: '0.9rem' }}>{app.clientName}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{app.clientPhone}</td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem' }}>{svc?.name || '—'}</td>
-                        <td style={{
-                          padding: '0.75rem 1rem', color: 'var(--gold-500)',
-                          fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-display)',
-                        }}>
-                          R$ {svc?.price.toFixed(2) || '—'}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          {app.paid ? (
-                            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <CheckCircle size={10} /> Pago
-                            </span>
-                          ) : (
-                            <span className="badge badge-warning">Pendente</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {displayDate}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                      <span className="badge" style={{
+                        background: 'rgba(212,167,74,0.06)', color: 'var(--text-secondary)',
+                        border: '1px solid var(--border)', fontSize: '0.65rem',
+                      }}>
+                        {svc?.name || '—'}
+                      </span>
+                      <span className="badge" style={{
+                        background: 'rgba(212,167,74,0.06)', color: 'var(--gold-500)',
+                        border: '1px solid var(--border)', fontSize: '0.65rem',
+                      }}>
+                        R$ {svc?.price.toFixed(2) || '—'}
+                      </span>
+                      {app.paid ? (
+                        <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>
+                          <CheckCircle size={8} /> Pago
+                        </span>
+                      ) : (
+                        <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>Pendente</span>
+                      )}
+                      {isConfirmed && (
+                        <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>Confirmado</span>
+                      )}
+                      {app.status === 'cancelled' && (
+                        <span className="badge" style={{
+                          background: 'var(--danger-bg)', color: 'var(--danger)',
+                          border: '1px solid rgba(248,113,113,0.15)', fontSize: '0.65rem',
+                        }}>Recusado</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {app.paymentProof && (
+                        <button className="btn btn-ghost"
+                          style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem', minHeight: 0 }}
+                          onClick={() => window.open(app.paymentProof, '_blank')}>
+                          <Eye size={11} /> Comprovante
+                        </button>
+                      )}
+                      {isConfirmed && (
+                        <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
+                          <button className="btn btn-ghost"
+                            style={{ color: 'var(--danger)', fontSize: '0.7rem', padding: '0.3rem 0.6rem', minHeight: 0 }}
+                            onClick={() => handleReject(app)}>
+                            <X size={11} /> Cancelar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
       {activeTab === 'schedule' && (
-        <div className="card">
-          <h3 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>Horários de Trabalho</h3>
-          <p style={{ marginBottom: '2rem', fontSize: '0.85rem' }}>
-            Ative os dias e defina os horários de atendimento.
+        <div className="card" style={{ padding: '1rem' }}>
+          <h3 style={{ fontSize: '1rem', marginBottom: '0.15rem' }}>Horários de Trabalho</h3>
+          <p style={{ marginBottom: '1.25rem', fontSize: '0.8rem' }}>
+            Almoço fixo das <strong>12:00</strong> às <strong>13:00</strong>
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {schedules.map(schedule => (
               <div
                 key={schedule.id}
-                className="flex-responsive"
                 style={{
-                  alignItems: 'center', gap: '1rem',
-                  padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)',
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6rem',
+                  padding: '0.7rem 0.85rem', borderRadius: 'var(--radius-md)',
                   background: schedule.isWorking ? 'rgba(212,167,74,0.03)' : 'var(--surface-elevated)',
                   border: `1px solid ${schedule.isWorking ? 'rgba(212,167,74,0.1)' : 'var(--border)'}`,
-                  transition: 'var(--transition)',
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={schedule.isWorking}
-                  onChange={e => handleScheduleChange(schedule.id, 'isWorking', e.target.checked)}
-                  style={{
-                    width: '18px', height: '18px', accentColor: 'var(--gold-500)',
-                    cursor: 'pointer', flexShrink: 0,
-                  }}
-                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', flex: '1 1 100%' }}>
+                  <input
+                    type="checkbox"
+                    checked={schedule.isWorking}
+                    onChange={e => handleScheduleChange(schedule.id, 'isWorking', e.target.checked)}
+                    style={{ width: '20px', height: '20px', accentColor: 'var(--gold-500)', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                    {daysOfWeek[schedule.dayOfWeek]}
+                  </span>
+                </label>
 
-                <span style={{ minWidth: '90px', fontWeight: 600, fontSize: '0.9rem' }}>
-                  {daysOfWeek[schedule.dayOfWeek]}
-                </span>
-
-                {schedule.isWorking ? (
-                  <div className="flex-responsive" style={{ gap: '0.75rem', flex: 1, alignItems: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>De</span>
+                {schedule.isWorking && (
+                  <div style={{
+                    display: 'flex', gap: '0.5rem', width: '100%',
+                    flexDirection: 'row', flexWrap: 'wrap',
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: '1 1 auto', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>De</span>
                       <input type="time" className="input"
                         value={schedule.startTime}
                         onChange={e => handleScheduleChange(schedule.id, 'startTime', e.target.value)}
-                        style={{ padding: '0.4rem 0.6rem', width: 'auto', fontSize: '0.85rem' }}
+                        style={{ padding: '0.5rem 0.6rem', fontSize: '0.85rem', minHeight: 40, width: '100%' }}
                       />
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Até</span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: '1 1 auto', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Até</span>
                       <input type="time" className="input"
                         value={schedule.endTime}
                         onChange={e => handleScheduleChange(schedule.id, 'endTime', e.target.value)}
-                        style={{ padding: '0.4rem 0.6rem', width: 'auto', fontSize: '0.85rem' }}
+                        style={{ padding: '0.5rem 0.6rem', fontSize: '0.85rem', minHeight: 40, width: '100%' }}
                       />
                     </label>
                   </div>
-                ) : (
-                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem' }}>Folga</span>
+                )}
+
+                {!schedule.isWorking && (
+                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem', marginLeft: '1.6rem' }}>Folga</span>
                 )}
               </div>
             ))}
           </div>
 
-          <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={handleSaveSchedule} disabled={saving}>
+          <div style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={handleSaveSchedule} disabled={saving}>
               {saving ? 'Salvando...' : 'Salvar Horários'}
             </button>
           </div>
