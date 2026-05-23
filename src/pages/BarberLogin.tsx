@@ -18,24 +18,17 @@ export function BarberLogin() {
 
     if (supabaseAvailable && supabase) {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) {
+      if (authError || !data.user) {
         setError('E-mail ou senha inválidos.');
         setIsLoading(false);
         return;
       }
-      if (data.user) {
-        sessionStorage.setItem('barber_auth', 'true');
-        navigate('/barber/dashboard');
-      }
+      sessionStorage.setItem('barber_auth', 'true');
+      navigate('/barber/dashboard');
     } else {
-      if (email === 'admin@barbearia.com' && password === 'admin') {
-        sessionStorage.setItem('barber_auth', 'true');
-        navigate('/barber/dashboard');
-      } else {
-        setError('Credenciais inválidas.');
-      }
+      setError('Supabase não configurado. Configure as variáveis de ambiente.');
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
@@ -69,7 +62,7 @@ export function BarberLogin() {
             <label>E-mail</label>
             <input type="email" className="input" value={email}
               onChange={e => setEmail(e.target.value)} required
-              placeholder="admin@barbearia.com" />
+              placeholder="admin@gmail.com" />
           </div>
           <div className="input-group">
             <label>Senha</label>

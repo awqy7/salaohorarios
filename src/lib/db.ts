@@ -1,6 +1,6 @@
 ﻿import type { Service, Appointment, BarberSchedule } from '../types';
+import { supabase, supabaseAvailable } from './supabase';
 
-// ─── Serviços (fixos no front) ──────────────────────────────────────────
 export const services: Service[] = [
   { id: '1', name: 'Corte Degradê (Fade)', price: 35, duration: 40, image: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=400&q=80' },
   { id: '2', name: 'Corte Americano',      price: 30, duration: 30, image: 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=400&q=80' },
@@ -9,7 +9,6 @@ export const services: Service[] = [
   { id: '5', name: 'Cabelo + Barba',       price: 55, duration: 60, image: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=400&q=80' },
 ];
 
-// ─── Horários padrão ───────────────────────────────────────────────────
 const defaultSchedules: BarberSchedule[] = [
   { id: '0', dayOfWeek: 0, isWorking: false, startTime: '09:00', endTime: '18:00', lunchStart: '12:00', lunchEnd: '13:00' },
   { id: '1', dayOfWeek: 1, isWorking: true,  startTime: '09:00', endTime: '19:00', lunchStart: '12:00', lunchEnd: '13:00' },
@@ -20,16 +19,8 @@ const defaultSchedules: BarberSchedule[] = [
   { id: '6', dayOfWeek: 6, isWorking: true,  startTime: '09:00', endTime: '17:00', lunchStart: '12:00', lunchEnd: '13:00' },
 ];
 
-// ─── Keys localStorage ──────────────────────────────────────────────────
 const LS_APPOINTMENTS = 'goldcuts_appointments';
 const LS_SCHEDULES    = 'goldcuts_schedules';
-
-// ─── Cache em memória ───────────────────────────────────────────────────
-let cachedAppointments: Appointment[] | null = null;
-let cachedSchedules: BarberSchedule[] | null = null;
-let cacheApptsAt = 0;
-let cacheSchedsAt = 0;
-const CACHE_TTL = 30_000; // 30s
 
 function loadFromLS<T>(key: string, fallback: T): T {
   try {
@@ -43,45 +34,109 @@ function loadFromLS<T>(key: string, fallback: T): T {
 function saveToLS(key: string, data: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(data));
-  } catch { /* quota exceeded, ignora */ }
+  } catch {
+    /* quota exceeded, ignora */
+  }
 }
 
 export async function getAppointments(): Promise<Appointment[]> {
-  const now = Date.now();
-  if (cachedAppointments && (now - cacheApptsAt) < CACHE_TTL) {
-    return cachedAppointments;
+  if (supabaseAvailable && supabase) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*')
+      .order('date', { ascending: false });
+    if (!error && data) {
+      const mapped = data.map((r: Record<string, unknown>) => ({
+        id: r.id as string,
+        clientName: r.clientname as string,
+        clientPhone: r.clientphone as string,
+        serviceId: r.serviceid as string,
+        date: r.date as string,
+        time: r.time as string,
+        status: r.status as Appointment['status'],
+        paid: r.paid as boolean,
+        paymentProof: r.paymentproof as string | undefined,
+        createdAt: r.createdat as string,
+      }));
+      return mapped;
+    }
   }
-  cachedAppointments = loadFromLS<Appointment[]>(LS_APPOINTMENTS, []);
-  cacheApptsAt = now;
-  return cachedAppointments;
+
+  return loadFromLS<Appointment[]>(LS_APPOINTMENTS, []);
 }
 
 export async function saveAppointment(a: Appointment): Promise<void> {
-  const all = await getAppointments();
+  if (supabaseAvailable && supabase) {
+    const record = {
+      id: a.id,
+      clientname: a.clientName,
+      clientphone: a.clientPhone,
+      serviceid: a.serviceId,
+      date: a.date,
+      time: a.time,
+      status: a.status,
+      paid: a.paid,
+      paymentproof: a.paymentProof || null,
+      createdat: a.createdAt,
+    };
+
+    const { error } = await supabase
+      .from('appointments')
+      .upsert(record, { onConflict: 'id' });
+
+    if (!error) return;
+  }
+
+  const all = loadFromLS<Appointment[]>(LS_APPOINTMENTS, []);
   const idx = all.findIndex(x => x.id === a.id);
   if (idx >= 0) {
     all[idx] = a;
   } else {
     all.push(a);
   }
-  cachedAppointments = all;
-  cacheApptsAt = Date.now();
   saveToLS(LS_APPOINTMENTS, all);
 }
 
 export async function getSchedules(): Promise<BarberSchedule[]> {
-  const now = Date.now();
-  if (cachedSchedules && (now - cacheSchedsAt) < CACHE_TTL) {
-    return cachedSchedules;
+  if (supabaseAvailable && supabase) {
+    const { data, error } = await supabase
+      .from('schedules')
+      .select('*')
+      .order('dayofweek', { ascending: true });
+    if (!error && data && data.length > 0) {
+      return data.map((r: Record<string, unknown>) => ({
+        id: r.id as string,
+        dayOfWeek: r.dayofweek as number,
+        isWorking: r.isworking as boolean,
+        startTime: r.starttime as string,
+        endTime: r.endtime as string,
+        lunchStart: r.lunchstart as string,
+        lunchEnd: r.lunchend as string,
+      }));
+    }
   }
-  cachedSchedules = loadFromLS<BarberSchedule[]>(LS_SCHEDULES, defaultSchedules);
-  cacheSchedsAt = now;
-  return cachedSchedules;
+
+  return loadFromLS<BarberSchedule[]>(LS_SCHEDULES, defaultSchedules);
 }
 
 export async function saveSchedules(schedules: BarberSchedule[]): Promise<void> {
-  cachedSchedules = schedules;
-  cacheSchedsAt = Date.now();
+  if (supabaseAvailable && supabase) {
+    for (const s of schedules) {
+      await supabase
+        .from('schedules')
+        .upsert({
+          id: s.id,
+          dayofweek: s.dayOfWeek,
+          isworking: s.isWorking,
+          starttime: s.startTime,
+          endtime: s.endTime,
+          lunchstart: s.lunchStart,
+          lunchend: s.lunchEnd,
+        }, { onConflict: 'id' });
+    }
+    return;
+  }
+
   saveToLS(LS_SCHEDULES, schedules);
 }
 
@@ -98,17 +153,14 @@ function computeAvailableTimes(
   const lunchEnd   = new Date(`${dateStr}T${daySchedule.lunchEnd}:00`);
 
   while (current < end) {
-    // Pula intervalo de almoço
     if (current >= lunchStart && current < lunchEnd) {
       current = lunchEnd;
       continue;
     }
 
     const timeStr = current.toTimeString().substring(0, 5);
-
     const slotEndTime = new Date(current.getTime() + duration * 60000);
 
-    // Se o horário extrapola o almoço, pula
     if (current < lunchEnd && slotEndTime > lunchStart) {
       current = lunchEnd;
       continue;

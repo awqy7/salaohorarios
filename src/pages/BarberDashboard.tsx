@@ -20,11 +20,14 @@ export function BarberDashboard() {
       navigate('/barber/login');
       return;
     }
-    (async () => {
+    const load = async () => {
       const [apps, scheds] = await Promise.all([getAppointments(), getSchedules()]);
       setAppointments(apps);
       setSchedules(scheds);
-    })();
+    };
+    load();
+    const interval = setInterval(load, 15_000);
+    return () => clearInterval(interval);
   }, [navigate]);
 
   const handleReject = async (app: Appointment) => {
