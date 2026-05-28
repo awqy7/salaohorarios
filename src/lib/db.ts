@@ -45,7 +45,7 @@ export async function getAppointments(): Promise<Appointment[]> {
       .from('appointments')
       .select('*')
       .order('date', { ascending: false });
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       const mapped = data.map((r: Record<string, unknown>) => ({
         id: r.id as string,
         clientName: r.clientname as string,
@@ -80,10 +80,8 @@ export async function saveAppointment(a: Appointment): Promise<void> {
       createdat: a.createdAt,
     };
 
-    const { error } = await (supabase.from('appointments') as any)
+    await (supabase.from('appointments') as any)
       .upsert(record, { onConflict: 'id' });
-
-    if (!error) return;
   }
 
   const all = loadFromLS<Appointment[]>(LS_APPOINTMENTS, []);

@@ -18,17 +18,18 @@ export function BarberLogin() {
 
     if (supabaseAvailable && supabase) {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError || !data.user) {
-        setError('E-mail ou senha inválidos.');
-        setIsLoading(false);
+      if (!authError && data.user) {
+        sessionStorage.setItem('barber_auth', 'true');
+        navigate('/barber/dashboard');
         return;
       }
-      sessionStorage.setItem('barber_auth', 'true');
-      navigate('/barber/dashboard');
-    } else {
-      setError('Supabase não configurado. Configure as variáveis de ambiente.');
+      setError(authError?.message || 'E-mail ou senha inválidos.');
       setIsLoading(false);
+      return;
     }
+
+    setError('Supabase não configurado.');
+    setIsLoading(false);
   };
 
   return (

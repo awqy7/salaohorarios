@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Users, Calendar, Settings, CheckCircle, BarChart2, LogOut, Clock, TrendingUp, Eye, X } from 'lucide-react';
+import { DollarSign, Users, Calendar, Settings, CheckCircle, BarChart2, LogOut, Clock, TrendingUp, Eye, X, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { getAppointments, getSchedules, saveSchedules, saveAppointment, services } from '../lib/db';
+import { ActionButton } from '../components/ActionButton';
 import type { Appointment, BarberSchedule } from '../types';
 
 const daysOfWeek = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -14,6 +15,13 @@ export function BarberDashboard() {
   const [schedules, setSchedules]       = useState<BarberSchedule[]>([]);
   const [activeTab, setActiveTab]       = useState<'overview' | 'appointments' | 'schedule'>('overview');
   const [saving, setSaving]             = useState(false);
+  const [loadingAppointmentId, setLoadingAppointmentId] = useState<string | null>(null);
+
+  const openWhatsApp = (phone: string, message: string) => {
+    const cleaned = phone.replace(/\D/g, '');
+    const full = cleaned.length === 11 ? `55${cleaned}` : cleaned.startsWith('55') ? cleaned : `55${cleaned}`;
+    window.open(`https://wa.me/${full}?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   useEffect(() => {
     if (!sessionStorage.getItem('barber_auth')) {
@@ -31,18 +39,46 @@ export function BarberDashboard() {
   }, [navigate]);
 
   const handleReject = async (app: Appointment) => {
-    const updated = { ...app, status: 'cancelled' as const };
-    await saveAppointment(updated);
-    setAppointments(prev => prev.map(a => a.id === app.id ? updated : a));
+    setLoadingAppointmentId(app.id);
+    try {
+      const updated = { ...app, status: 'cancelled' as const };
+      await saveAppointment(updated);
+      setAppointments(prev => prev.map(a => a.id === app.id ? updated : a));
+    } catch (err) {
+      console.error('Erro ao cancelar agendamento:', err);
+      alert('Erro ao cancelar agendamento. Tente novamente.');
+    } finally {
+      setLoadingAppointmentId(null);
+    }
+  };
+
+  const handleConfirmAppointment = async (app: Appointment) => {
+    setLoadingAppointmentId(app.id);
+    try {
+      const updated = { ...app, status: 'confirmed' as const };
+      await saveAppointment(updated);
+      setAppointments(prev => prev.map(a => a.id === app.id ? updated : a));
+    } catch (err) {
+      console.error('Erro ao confirmar agendamento:', err);
+      alert('Erro ao confirmar agendamento. Tente novamente.');
+    } finally {
+      setLoadingAppointmentId(null);
+    }
   };
 
   const handleSaveSchedule = async () => {
     setSaving(true);
-    const fixed = schedules.map(s => ({ ...s, lunchStart: '12:00', lunchEnd: '13:00' }));
-    setSchedules(fixed);
-    await saveSchedules(fixed);
-    setSaving(false);
-    alert('Horários salvos com sucesso!');
+    try {
+      const fixed = schedules.map(s => ({ ...s, lunchStart: '12:00', lunchEnd: '13:00' }));
+      setSchedules(fixed);
+      await saveSchedules(fixed);
+      alert('Horários salvos com sucesso!');
+    } catch (err) {
+      console.error('Erro ao salvar horários:', err);
+      alert('Erro ao salvar horários. Tente novamente.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -182,7 +218,16 @@ export function BarberDashboard() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {confirmed.sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)).map(app => {
+             {confirmed
+               .sort((a, b) => {
+                 // Pendentes primeiro
+                 if (a.status !== b.status) {
+                   return a.status === 'pending' ? -1 : 1;
+                 }
+                 // Depois ordena por data/hora
+                 return `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`);
+               })
+               .map(app => {
                 const svc = services.find(s => s.id === app.serviceId);
                 const displayDate = format(new Date(app.date + 'T00:00:00'), 'dd/MM');
                 const isConfirmed = app.status === 'confirmed';
@@ -246,19 +291,67 @@ export function BarberDashboard() {
 
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       {app.paymentProof && (
-                        <button className="btn btn-ghost"
-                          style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem', minHeight: 0 }}
-                          onClick={() => window.open(app.paymentProof, '_blank')}>
-                          <Eye size={11} /> Comprovante
-                        </button>
+                        <ActionButton
+                          icon={Eye}
+                          label="Comprovante"
+                          size="sm"
+                          onClick={() => {
+                            window.open(app.paymentProof, '_blank');
+                          }}
+                        />
+                      )}
+                      {app.status === 'pending' && (
+                        <>
+                          <ActionButton
+                            icon={CheckCircle}
+                            label="Confirmar"
+                            size="sm"
+                            variant="primary"
+                            isLoading={loadingAppointmentId === app.id}
+                            isDisabled={loadingAppointmentId !== null && loadingAppointmentId !== app.id}
+                            onClick={() => handleConfirmAppointment(app)}
+                          />
+                          <button
+                            className="btn"
+                            style={{
+                              padding: '0.3rem 0.6rem', fontSize: '0.7rem',
+                              background: '#25D366', color: '#fff', border: 'none',
+                              borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                              fontWeight: 600, whiteSpace: 'nowrap',
+                            }}
+                            onClick={() => openWhatsApp(app.clientPhone, `Olá ${app.clientName}! Tudo bem? Recebi seu agendamento para ${app.time}. Estou confirmando aqui!`)}
+                            title="WhatsApp"
+                          >
+                            <MessageCircle size={11} /> WhatsApp
+                          </button>
+                        </>
                       )}
                       {isConfirmed && (
-                        <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
-                          <button className="btn btn-ghost"
-                            style={{ color: 'var(--danger)', fontSize: '0.7rem', padding: '0.3rem 0.6rem', minHeight: 0 }}
-                            onClick={() => handleReject(app)}>
-                            <X size={11} /> Cancelar
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button
+                            className="btn"
+                            style={{
+                              padding: '0.3rem 0.6rem', fontSize: '0.7rem',
+                              background: '#25D366', color: '#fff', border: 'none',
+                              borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                              fontWeight: 600, whiteSpace: 'nowrap',
+                            }}
+                            onClick={() => openWhatsApp(app.clientPhone, `Olá ${app.clientName}! Seu horario foi confirmado! Te espero no horario marcado!`)}
+                            title="WhatsApp"
+                          >
+                            <MessageCircle size={11} /> WhatsApp
                           </button>
+                          <ActionButton
+                            icon={X}
+                            label="Cancelar"
+                            size="sm"
+                            variant="danger"
+                            isLoading={loadingAppointmentId === app.id}
+                            isDisabled={loadingAppointmentId !== null && loadingAppointmentId !== app.id}
+                            onClick={() => handleReject(app)}
+                          />
                         </div>
                       )}
                     </div>

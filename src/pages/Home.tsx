@@ -4,6 +4,7 @@ import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, Clock, User, ArrowRight, Sparkles, Check, Star, Timer } from 'lucide-react';
 import { services, prefetchAvailableTimes } from '../lib/db';
+import { SelectableCard } from '../components/SelectableCard';
 import type { Service } from '../types';
 
 const popularId = '5';
@@ -46,6 +47,13 @@ export function Home() {
 
   const handleContinue = () => {
     if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone) return;
+    
+    const clientPhoneRegex = /^\(\d{2}\)\s?\d{4,5}-?\d{4}$/;
+    if (!clientPhoneRegex.test(clientPhone)) {
+      alert('Por favor, digite um número de WhatsApp válido no formato (00) 00000-0000');
+      return;
+    }
+    
     sessionStorage.setItem('booking_draft', JSON.stringify({
       service: selectedService, date: selectedDate, time: selectedTime, clientName, clientPhone,
     }));
@@ -90,14 +98,11 @@ export function Home() {
                 const isPopular = svc.id === popularId;
 
                 return (
-                  <div
+                  <SelectableCard
                     key={svc.id}
+                    isSelected={isSelected}
                     onClick={() => setSelectedService(svc)}
-                    className="card selectable-card"
-                    style={{
-                      padding: 0, overflow: 'hidden', cursor: 'pointer',
-                      position: 'relative',
-                    }}
+                    style={{ padding: 0, overflow: 'hidden', position: 'relative' }}
                   >
                     {isPopular && !isSelected && (
                       <div style={{
@@ -164,7 +169,7 @@ export function Home() {
                         R$ {svc.price.toFixed(2)}
                       </div>
                     </div>
-                  </div>
+                  </SelectableCard>
                 );
               })}
             </div>
@@ -190,46 +195,44 @@ export function Home() {
                 Datas Disponíveis
               </label>
               <div className="scroll-x" style={{ marginBottom: '1.25rem' }}>
-                {upcomingDates.map(date => {
-                  const d = new Date(date + 'T00:00:00');
-                  const isToday = format(d, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-                  return (
-                    <div
-                      key={date}
-                      onClick={() => setSelectedDate(date)}
-                      className="card selectable-card"
-                      style={{
-                        minWidth: '74px', padding: '0.65rem 0.4rem', textAlign: 'center',
-                        cursor: 'pointer', borderRadius: 'var(--radius-md)',
-                        position: 'relative',
-                      }}
-                    >
-                      {isToday && (
-                        <div style={{
-                          position: 'absolute', top: '-5px', left: '50%', transform: 'translateX(-50%)',
-                          fontSize: '0.5rem', fontWeight: 700, color: 'var(--text-inverse)',
-                          background: 'var(--gold-gradient)', padding: '1px 7px',
-                          borderRadius: 4, whiteSpace: 'nowrap',
-                        }}>
-                          HOJE
-                        </div>
-                      )}
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'capitalize', marginBottom: 2, fontWeight: 500 }}>
-                        {format(d, 'EEE', { locale: ptBR })}
-                      </div>
-                      <div style={{
-                        fontSize: '1.15rem', fontWeight: 700,
-                        color: selectedDate === date ? 'var(--gold-500)' : 'var(--text-primary)',
-                        lineHeight: 1.3,
-                      }}>
-                        {format(d, 'dd')}
-                      </div>
-                      <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'capitalize', fontWeight: 500 }}>
-                        {format(d, 'MMM', { locale: ptBR })}
-                      </div>
-                    </div>
-                  );
-                })}
+               {upcomingDates.map(date => {
+                 const d = new Date(date + 'T00:00:00');
+                 const isToday = format(d, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                 const isSelected = selectedDate === date;
+                  
+                 return (
+                   <SelectableCard
+                     key={date}
+                     isSelected={isSelected}
+                     onClick={() => setSelectedDate(date)}
+                     style={{ minWidth: '74px', padding: '0.65rem 0.4rem', textAlign: 'center', borderRadius: 'var(--radius-md)', position: 'relative' }}
+                   >
+                     {isToday && (
+                       <div style={{
+                         position: 'absolute', top: '-5px', left: '50%', transform: 'translateX(-50%)',
+                         fontSize: '0.5rem', fontWeight: 700, color: 'var(--text-inverse)',
+                         background: 'var(--gold-gradient)', padding: '1px 7px',
+                         borderRadius: 4, whiteSpace: 'nowrap',
+                       }}>
+                         HOJE
+                       </div>
+                     )}
+                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'capitalize', marginBottom: 2, fontWeight: 500 }}>
+                       {format(d, 'EEE', { locale: ptBR })}
+                     </div>
+                     <div style={{
+                       fontSize: '1.15rem', fontWeight: 700,
+                       color: isSelected ? 'var(--gold-500)' : 'var(--text-primary)',
+                       lineHeight: 1.3,
+                     }}>
+                       {format(d, 'dd')}
+                     </div>
+                     <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'capitalize', fontWeight: 500 }}>
+                       {format(d, 'MMM', { locale: ptBR })}
+                     </div>
+                   </SelectableCard>
+                 );
+               })}
               </div>
 
               {selectedDate && (
@@ -248,20 +251,14 @@ export function Home() {
                   ) : (
                     <div className="times-grid">
                       {availableTimes.map(t => (
-                        <div
+                        <SelectableCard
                           key={t}
+                          isSelected={selectedTime === t}
                           onClick={() => setSelectedTime(t)}
-                          className="card selectable-card"
-                          style={{
-                            padding: '0.75rem 0.3rem', textAlign: 'center', cursor: 'pointer',
-                            fontWeight: 600, fontSize: '0.9rem', borderRadius: 'var(--radius-md)',
-                            fontFamily: 'var(--font-display)', minHeight: '44px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: selectedTime === t ? 'var(--gold-500)' : 'var(--text-primary)',
-                          }}
+                          style={{ padding: '0.75rem 0.3rem', textAlign: 'center', fontWeight: 600, fontSize: '0.9rem', borderRadius: 'var(--radius-md)', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectedTime === t ? 'var(--gold-500)' : 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
                         >
                           {t}
-                        </div>
+                        </SelectableCard>
                       ))}
                     </div>
                   )}
@@ -286,8 +283,24 @@ export function Home() {
           </div>
           <div className="input-group">
             <label>WhatsApp</label>
-            <input type="tel" className="input" placeholder="(00) 00000-0000"
-              value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+            <input 
+              type="tel" 
+              className="input" 
+              placeholder="(00) 00000-0000"
+              value={clientPhone} 
+              onChange={e => {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length > 11) value = value.slice(0, 11);
+                
+                if (value.length <= 2) {
+                  setClientPhone(value ? `(${value}` : '');
+                } else if (value.length <= 6) {
+                  setClientPhone(`(${value.slice(0, 2)}) ${value.slice(2)}`);
+                } else {
+                  setClientPhone(`(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`);
+                }
+              }}
+            />
           </div>
         </div>
 
